@@ -177,6 +177,7 @@
       }
 
       textarea,
+      input[type='search'],
       input[type='number'],
       select {
         border: 1px solid var(--line);
@@ -207,12 +208,19 @@
         padding: 0 12px;
       }
 
+      input[type='search'] {
+        width: min(360px, 100%);
+        height: 38px;
+        padding: 0 12px;
+      }
+
       select {
         height: 38px;
         padding: 0 10px;
       }
 
       textarea:focus,
+      input[type='search']:focus,
       input[type='number']:focus {
         border-color: rgba(255, 206, 69, 0.58);
         box-shadow: 0 0 0 4px rgba(255, 206, 69, 0.1);
@@ -461,6 +469,16 @@
         margin-bottom: 16px;
       }
 
+      .history-search {
+        min-width: 260px;
+        flex: 1;
+      }
+
+      .history-search input {
+        display: block;
+        margin-top: 6px;
+      }
+
       .history-list {
         display: grid;
         gap: 14px;
@@ -622,6 +640,11 @@
           margin-bottom: 12px;
         }
 
+        .history-search {
+          min-width: 0;
+          margin-top: 12px;
+        }
+
         .vote-actions {
           margin-top: 12px;
         }
@@ -709,6 +732,10 @@
               <h2 class="history-title">Generation History</h2>
               <div class="meta" id="historyMeta">Loading history...</div>
             </div>
+            <label class="history-search">
+              Search
+              <input id="historySearch" type="search" maxlength="1000" placeholder="Prompt, filename, seed..." autocomplete="off" />
+            </label>
             <label>
               Per page
               <select id="historyPageSize">
@@ -761,6 +788,7 @@
       const historyNext = document.getElementById('historyNext');
       const historyPageSize = document.getElementById('historyPageSize');
       const historySort = document.getElementById('historySort');
+      const historySearch = document.getElementById('historySearch');
 
       let historyEntries = [];
       let historyCurrentPage = 1;
@@ -1144,9 +1172,31 @@
         }
       }
 
+      function normalizeSearch(value) {
+        return String(value || '').toLocaleLowerCase().replace(/\s+/g, ' ').trim();
+      }
+
+      function historySearchText(entry) {
+        return normalizeSearch([
+          entry.id,
+          entry.title,
+          entry.prompt,
+          entry.negative_prompt,
+          entry.audio_filename,
+          entry.model,
+          entry.seed,
+          entry.duration ? `${Math.round(Number(entry.duration))}s` : '',
+          formatTimestamp(entry.timestamp),
+        ].filter(Boolean).join(' '));
+      }
+
       function renderHistory() {
         const pageSize = Number(historyPageSize.value || 5);
-        const sortedEntries = [...historyEntries].sort((a, b) => {
+        const query = normalizeSearch(historySearch.value);
+        const filteredEntries = query
+          ? historyEntries.filter((entry) => historySearchText(entry).includes(query))
+          : historyEntries;
+        const sortedEntries = [...filteredEntries].sort((a, b) => {
           const aVotes = voteInfo(a.id);
           const bVotes = voteInfo(b.id);
           if (historySort.value === 'likes') {
@@ -1163,13 +1213,17 @@
         const start = (historyCurrentPage - 1) * pageSize;
         const visible = sortedEntries.slice(start, start + pageSize);
 
-        historyMeta.textContent = total ? `${total} generations` : 'No generations yet';
+        historyMeta.textContent = query
+          ? `${total} of ${historyEntries.length} generations`
+          : (total ? `${total} generations` : 'No generations yet');
         historyPage.textContent = `Page ${historyCurrentPage} / ${pages}`;
         historyPrev.disabled = historyCurrentPage <= 1;
         historyNext.disabled = historyCurrentPage >= pages;
 
         if (!visible.length) {
-          historyList.innerHTML = '<div class="empty">No saved generations yet.</div>';
+          historyList.innerHTML = query
+            ? '<div class="empty">No generations match this search.</div>'
+            : '<div class="empty">No saved generations yet.</div>';
           return;
         }
 
@@ -1310,6 +1364,10 @@
         renderHistory();
       });
       historySort.addEventListener('change', () => {
+        historyCurrentPage = 1;
+        renderHistory();
+      });
+      historySearch.addEventListener('input', () => {
         historyCurrentPage = 1;
         renderHistory();
       });
