@@ -51,6 +51,34 @@
         box-shadow: 0 28px 90px rgba(0, 0, 0, 0.52);
       }
 
+      .tabs {
+        display: inline-flex;
+        gap: 6px;
+        margin-bottom: 12px;
+        border: 1px solid var(--line);
+        background: rgba(2, 4, 10, 0.48);
+        padding: 6px;
+      }
+
+      .tab-button {
+        height: 38px;
+        min-width: 108px;
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .tab-button.active {
+        border-color: rgba(255, 206, 69, 0.5);
+        background: rgba(255, 206, 69, 0.14);
+        color: var(--text);
+      }
+
+      .tab-panel[hidden] {
+        display: none;
+      }
+
       .header {
         display: flex;
         align-items: center;
@@ -128,7 +156,8 @@
       }
 
       textarea,
-      input[type='number'] {
+      input[type='number'],
+      select {
         border: 1px solid var(--line);
         background: rgba(2, 4, 10, 0.74);
         color: var(--text);
@@ -155,6 +184,11 @@
         width: 100%;
         height: 42px;
         padding: 0 12px;
+      }
+
+      select {
+        height: 38px;
+        padding: 0 10px;
       }
 
       textarea:focus,
@@ -375,6 +409,94 @@
         white-space: pre-wrap;
       }
 
+      .history {
+        padding: 24px;
+      }
+
+      .history-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+
+      .history-list {
+        display: grid;
+        gap: 14px;
+      }
+
+      .history-item {
+        display: grid;
+        gap: 12px;
+      }
+
+      .history-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .history-title {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 850;
+      }
+
+      .prompt-preview {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .prompt-details {
+        border: 1px solid var(--line);
+        background: rgba(2, 4, 10, 0.42);
+      }
+
+      .prompt-details summary {
+        padding: 10px 12px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .prompt-full {
+        margin: 0;
+        padding: 0 12px 12px;
+        color: var(--text);
+        white-space: pre-wrap;
+        line-height: 1.45;
+        font-size: 13px;
+      }
+
+      .history-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+      }
+
+      .history-actions audio {
+        flex: 1;
+      }
+
+      .pager {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .pager button {
+        height: 38px;
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text);
+        border: 1px solid var(--line);
+      }
+
       @media (max-width: 820px) {
         main {
           width: min(100% - 20px, 980px);
@@ -382,6 +504,7 @@
           align-content: start;
         }
 
+        .tabs,
         .header,
         .row,
         .settings {
@@ -403,6 +526,17 @@
           margin-top: 12px;
         }
 
+        .history-toolbar,
+        .history-head,
+        .history-actions,
+        .pager {
+          display: block;
+        }
+
+        .history-actions audio {
+          margin-bottom: 12px;
+        }
+
         .spectrogram-grid {
           grid-template-columns: 1fr;
         }
@@ -411,6 +545,11 @@
   </head>
   <body>
     <main>
+      <nav class="tabs" aria-label="Sections">
+        <button class="tab-button active" type="button" data-tab="generate">Generate</button>
+        <button class="tab-button" type="button" data-tab="history">History</button>
+      </nav>
+
       <section class="shell">
         <div class="header">
           <div class="brand">
@@ -423,7 +562,7 @@
           <div class="status" id="health">Checking backend...</div>
         </div>
 
-        <div class="body">
+        <div class="body tab-panel" id="generatePanel">
           <form class="compose" id="form">
             <div class="prompt-head">
               <label for="prompt">Prompt</label>
@@ -461,6 +600,29 @@
             <div id="result" class="empty">The audio player will appear here after generation.</div>
           </aside>
         </div>
+
+        <div class="history tab-panel" id="historyPanel" hidden>
+          <div class="history-toolbar">
+            <div>
+              <h2 class="history-title">Generation History</h2>
+              <div class="meta" id="historyMeta">Loading history...</div>
+            </div>
+            <label>
+              Per page
+              <select id="historyPageSize">
+                <option value="5" selected>5</option>
+                <option value="10">10</option>
+                <option value="20">20</option>
+              </select>
+            </label>
+          </div>
+          <div class="history-list" id="historyList"></div>
+          <div class="pager">
+            <button id="historyPrev" type="button">Prev</button>
+            <span class="meta" id="historyPage">Page 1 / 1</span>
+            <button id="historyNext" type="button">Next</button>
+          </div>
+        </div>
       </section>
     </main>
 
@@ -477,6 +639,19 @@
       const negativeCount = document.getElementById('negativeCount');
       const durationRange = document.getElementById('durationRange');
       const durationLabel = document.getElementById('durationLabel');
+      const tabButtons = Array.from(document.querySelectorAll('.tab-button'));
+      const generatePanel = document.getElementById('generatePanel');
+      const historyPanel = document.getElementById('historyPanel');
+      const historyList = document.getElementById('historyList');
+      const historyMeta = document.getElementById('historyMeta');
+      const historyPage = document.getElementById('historyPage');
+      const historyPrev = document.getElementById('historyPrev');
+      const historyNext = document.getElementById('historyNext');
+      const historyPageSize = document.getElementById('historyPageSize');
+
+      let historyEntries = [];
+      let historyCurrentPage = 1;
+      let historyLoaded = false;
 
       function randomSeed() {
         return String(Math.floor(Math.random() * 2147483647));
@@ -602,6 +777,32 @@
           .replaceAll("'", '&#39;');
       }
 
+      function truncateText(value, max = 180) {
+        const text = String(value || '').replace(/\s+/g, ' ').trim();
+        if (text.length <= max) return text || 'No prompt';
+        return `${text.slice(0, max - 1).trim()}...`;
+      }
+
+      function formatTimestamp(value) {
+        if (!value) return 'Unknown time';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return String(value);
+        return date.toLocaleString(undefined, {
+          year: 'numeric',
+          month: 'short',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      }
+
+      function formatBytes(bytes) {
+        const value = Number(bytes || 0);
+        if (!value) return '';
+        if (value >= 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MB`;
+        return `${Math.round(value / 1024)} KB`;
+      }
+
       function hasSpectrograms(spectrograms) {
         return Boolean(spectrograms && ['mel', 'stft', 'chromagram', 'cqt'].some((key) => spectrograms[key]));
       }
@@ -705,6 +906,89 @@
         }
       }
 
+      function switchTab(tab) {
+        const isHistory = tab === 'history';
+        generatePanel.hidden = isHistory;
+        historyPanel.hidden = !isHistory;
+        tabButtons.forEach((button) => {
+          button.classList.toggle('active', button.dataset.tab === tab);
+        });
+        if (isHistory && !historyLoaded) {
+          void loadHistory();
+        }
+      }
+
+      function renderHistory() {
+        const pageSize = Number(historyPageSize.value || 5);
+        const total = historyEntries.length;
+        const pages = Math.max(1, Math.ceil(total / pageSize));
+        historyCurrentPage = Math.max(1, Math.min(historyCurrentPage, pages));
+        const start = (historyCurrentPage - 1) * pageSize;
+        const visible = historyEntries.slice(start, start + pageSize);
+
+        historyMeta.textContent = total ? `${total} generations` : 'No generations yet';
+        historyPage.textContent = `Page ${historyCurrentPage} / ${pages}`;
+        historyPrev.disabled = historyCurrentPage <= 1;
+        historyNext.disabled = historyCurrentPage >= pages;
+
+        if (!visible.length) {
+          historyList.innerHTML = '<div class="empty">No saved generations yet.</div>';
+          return;
+        }
+
+        historyList.innerHTML = visible.map((entry) => {
+          const prompt = entry.prompt || '';
+          const title = entry.title || entry.audio_filename || 'Generation';
+          const meta = [
+            formatTimestamp(entry.timestamp),
+            entry.duration ? `${Math.round(Number(entry.duration))}s` : '',
+            entry.model ? String(entry.model).toUpperCase() : '',
+            entry.seed !== undefined ? `Seed ${entry.seed}` : '',
+            formatBytes(entry.file_size_bytes),
+          ].filter(Boolean).join(' | ');
+          const audioUrl = entry.audio_url || `/api/library/audio/${encodeURIComponent(entry.id)}`;
+          const filename = entry.audio_filename || `${entry.id}.wav`;
+
+          return `
+            <article class="card history-item">
+              <div class="history-head">
+                <h3 class="history-title">${escapeHtml(truncateText(title, 80))}</h3>
+                <span class="meta">${escapeHtml(meta)}</span>
+              </div>
+              <p class="prompt-preview">${escapeHtml(truncateText(prompt, 220))}</p>
+              <details class="prompt-details">
+                <summary>Full prompt</summary>
+                <p class="prompt-full">${escapeHtml(prompt || 'No prompt')}</p>
+              </details>
+              <div class="history-actions">
+                <audio controls preload="none" src="${escapeHtml(audioUrl)}"></audio>
+                <a class="download" download="${escapeHtml(filename)}" href="${escapeHtml(audioUrl)}">Download</a>
+              </div>
+            </article>
+          `;
+        }).join('');
+      }
+
+      async function loadHistory() {
+        historyLoaded = true;
+        historyMeta.textContent = 'Loading history...';
+        historyList.innerHTML = '<div class="empty">Loading saved generations...</div>';
+        try {
+          const response = await fetch('/api/library/entries', { cache: 'no-store' });
+          const payload = await readJson(response);
+          if (!response.ok) throw new Error(payload.detail || payload.error || `HTTP ${response.status}`);
+          historyEntries = (payload.entries || [])
+            .filter((entry) => entry && entry.audio_url)
+            .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+          historyCurrentPage = 1;
+          renderHistory();
+        } catch (error) {
+          historyLoaded = false;
+          historyMeta.textContent = 'History unavailable';
+          historyList.innerHTML = `<div class="card error">${escapeHtml(error?.message || String(error))}</div>`;
+        }
+      }
+
       async function pollJob(id) {
         while (true) {
           const response = await fetch(`/api/jobs/${id}`, { cache: 'no-store' });
@@ -761,6 +1045,7 @@
           if (!id) throw new Error('Backend did not return a job id.');
 
           await pollJob(id);
+          historyLoaded = false;
         } catch (error) {
           showError(error?.message || String(error));
         } finally {
@@ -772,6 +1057,21 @@
       durationRange.addEventListener('input', () => syncDuration(durationRange.value));
       promptInput.addEventListener('input', updateCounters);
       negativeInput.addEventListener('input', updateCounters);
+      tabButtons.forEach((button) => {
+        button.addEventListener('click', () => switchTab(button.dataset.tab));
+      });
+      historyPageSize.addEventListener('change', () => {
+        historyCurrentPage = 1;
+        renderHistory();
+      });
+      historyPrev.addEventListener('click', () => {
+        historyCurrentPage -= 1;
+        renderHistory();
+      });
+      historyNext.addEventListener('click', () => {
+        historyCurrentPage += 1;
+        renderHistory();
+      });
 
       syncDuration(60);
       promptInput.value = randomPrompt();
