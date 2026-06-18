@@ -172,8 +172,12 @@
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
         gap: 14px;
-        align-items: end;
+        align-items: start;
         margin-top: 16px;
+      }
+
+      .settings button {
+        margin-top: 20px;
       }
 
       .field label {
@@ -491,6 +495,25 @@
         custom_name: '',
       };
 
+      const promptIdeas = [
+        'cyberpunk post rock anthem, warm analog drums, wide cinematic guitars, glowing synth bass, emotional lead melody, polished modern mix',
+        'dark cinematic drum and bass, aggressive reese bass, orchestral hits, neon city atmosphere, crisp breakbeats, huge festival drop',
+        'dreamy synthwave road trip, lush Juno pads, pulsing arpeggios, gated snare, nostalgic sunset mood, clean instrumental mix',
+        'epic trailer hybrid rock, massive toms, distorted baritone guitars, heroic brass, rising strings, thunderous final chorus',
+        'lo-fi jazz hop at midnight, dusty piano chords, brushed drums, mellow upright bass, vinyl texture, warm tape saturation',
+        'industrial techno warehouse groove, metallic percussion, hypnotic acid bassline, cold synth stabs, dark spacious reverb',
+        'uplifting progressive house, shimmering plucks, sidechained pads, bright piano hook, driving kick, euphoric hands-in-the-air climax',
+        'mystical desert electronica, deep frame drums, oud-like lead, airy female vocal chops without lyrics, cinematic low bass',
+        'space ambient score, slow evolving pads, granular textures, distant choir, subtle sub pulses, beautiful zero-gravity atmosphere',
+        'funky electro breakbeat, slap bass synth, tight 808 drums, talkbox-style lead, playful robot groove, punchy club master',
+        'melancholic piano and strings, intimate felt piano, soft cello counter melody, delicate ambient shimmer, emotional film scene',
+        'heavy cyber metal instrumental, precise double kick, syncopated low guitars, glitch synths, dramatic breakdown, powerful mix',
+      ];
+
+      function randomPrompt() {
+        return promptIdeas[Math.floor(Math.random() * promptIdeas.length)];
+      }
+
       function clampDuration(value) {
         if (String(value).trim() === '') return 60;
         const number = Math.round(Number(value));
@@ -751,6 +774,7 @@
       negativeInput.addEventListener('input', updateCounters);
 
       syncDuration(60);
+      promptInput.value = randomPrompt();
       updateCounters();
       checkHealth();
       setInterval(checkHealth, 15000);
