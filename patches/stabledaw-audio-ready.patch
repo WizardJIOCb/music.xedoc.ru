@@ -1,0 +1,40 @@
+diff --git a/backend/server.py b/backend/server.py
+--- a/backend/server.py
++++ b/backend/server.py
+@@ -1113,6 +1113,17 @@ async def _run_generate_job(
+                         int(args.get("seed", -1)),
+                         custom_name,
+                     )
++                    item = {
++                        "audio_base64": base64.b64encode(audio_bytes).decode("ascii"),
++                        "mime_type": mime_type,
++                        "filename": filename,
++                    }
++                    items.append(item)
++                    if batch_size > 1:
++                        JOBS[job_id]["result"] = {"batch": True, "items": items}
++                    else:
++                        JOBS[job_id]["result"] = {"batch": False, "item": item}
++                    JOBS[job_id]["status"] = "audio_ready"
+ 
+                     def _do_specs_and_save():
+                         waveform, sr = torchaudio.load(io.BytesIO(audio_bytes))
+@@ -1190,17 +1201,7 @@ async def _run_generate_job(
+                     _add_to_spec_cache(f"{job_id}:{i}", spectrograms)
+                     if i == 0:
+                         _add_to_spec_cache(job_id, spectrograms)
+-                    items.append(
+-                        {
+-                            "audio_base64": base64.b64encode(audio_bytes).decode(
+-                                "ascii"
+-                            ),
+-                            "mime_type": mime_type,
+-                            "filename": filename,
+-                            "spectrograms": spectrograms,
+-                            **artifact_info,
+-                        }
+-                    )
++                    item.update({"spectrograms": spectrograms, **artifact_info})
+             finally:
+                 if lora_paths:
+                     _clear_generation_loras(generation_pipeline)

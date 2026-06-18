@@ -346,6 +346,12 @@
         height: auto;
       }
 
+      .spectrogram-pending {
+        padding: 0 18px 18px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
       audio {
         width: 100%;
       }
@@ -595,7 +601,11 @@
           .replaceAll("'", '&#39;');
       }
 
-      function renderSpectrograms(spectrograms) {
+      function hasSpectrograms(spectrograms) {
+        return Boolean(spectrograms && ['mel', 'stft', 'chromagram', 'cqt'].some((key) => spectrograms[key]));
+      }
+
+      function renderSpectrograms(spectrograms, pending = false) {
         const labels = {
           mel: 'MEL',
           stft: 'STFT',
@@ -606,7 +616,15 @@
           .map(([key, label]) => ({ key, label, value: spectrograms?.[key] }))
           .filter((entry) => entry.value);
 
-        if (!entries.length) return '';
+        if (!entries.length) {
+          if (!pending) return '';
+          return `
+            <details class="card">
+              <summary>Spectrograms</summary>
+              <div class="spectrogram-pending">Preparing spectrograms...</div>
+            </details>
+          `;
+        }
 
         const images = entries.map((entry) => `
           <div class="spectrogram">
@@ -636,8 +654,16 @@
           <div class="card">
             <a class="download" download="${escapeHtml(filename)}" href="${src}">Download result</a>
           </div>
-          ${renderSpectrograms(spectrograms)}
+          <div id="spectrogramSlot">${renderSpectrograms(spectrograms, !hasSpectrograms(spectrograms))}</div>
         `;
+      }
+
+      function updateSpectrogramSlot(spectrograms) {
+        if (!hasSpectrograms(spectrograms)) return false;
+        const slot = document.getElementById('spectrogramSlot');
+        if (!slot) return false;
+        slot.innerHTML = renderSpectrograms(spectrograms);
+        return true;
       }
 
       async function loadSpectrograms(jobId, index = 0) {
@@ -647,6 +673,14 @@
           return await readJson(response);
         } catch {
           return null;
+        }
+      }
+
+      async function attachSpectrogramsWhenReady(jobId, index = 0) {
+        for (let attempt = 0; attempt < 60; attempt += 1) {
+          const spectrograms = await loadSpectrograms(jobId, index);
+          if (updateSpectrogramSlot(spectrograms)) return;
+          await new Promise((resolve) => setTimeout(resolve, 2000));
         }
       }
 
@@ -677,12 +711,20 @@
           if (!response.ok) throw new Error(job.detail || job.error || `HTTP ${response.status}`);
           setProgress(job.progress);
 
+          const item = job.result?.item || job.result?.items?.[0];
+          if (item?.audio_base64) {
+            setProgress({ step: Number(defaults.steps), steps: Number(defaults.steps) });
+            showPlayer(item, item.spectrograms);
+            if (!hasSpectrograms(item.spectrograms)) {
+              void attachSpectrogramsWhenReady(id, 0);
+            }
+            return;
+          }
+
           if (job.status === 'completed') {
-            const item = job.result?.item || job.result?.items?.[0];
             if (!item?.audio_base64) throw new Error('Generation completed without audio.');
             setProgress({ step: Number(defaults.steps), steps: Number(defaults.steps) });
-            const spectrograms = item.spectrograms || await loadSpectrograms(id, 0);
-            showPlayer(item, spectrograms);
+            showPlayer(item, item.spectrograms);
             return;
           }
 
