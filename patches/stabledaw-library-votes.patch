@@ -1,8 +1,8 @@
-diff --git a/backend/modules/library/router.py b/backend/modules/library/router.py
+﻿diff --git a/backend/modules/library/router.py b/backend/modules/library/router.py
+index b7d02e5..d2d3df9 100644
 --- a/backend/modules/library/router.py
 +++ b/backend/modules/library/router.py
-@@ -35,12 +35,106 @@ def get_store() -> LibraryStore:
- 
+@@ -45,19 +45,153 @@ def get_store() -> LibraryStore:
  router = APIRouter()
  
  
@@ -55,10 +55,26 @@ diff --git a/backend/modules/library/router.py b/backend/modules/library/router.
 +    }
 +
 +
++def _metadata_for_entry(entry_id: str) -> dict[str, Any]:
++    store = get_store()
++    entry_dir = store._dir_for(entry_id)  # noqa: SLF001
++    if entry_dir is None:
++        return {}
++    return _read_metadata(entry_dir) or {}
++
++
  @router.get("/entries")
  def list_entries() -> dict[str, Any]:
      store = get_store()
-     entries = [r.to_dict() for r in store.list_entries()]
+-    entries = [r.to_dict() for r in store.list_entries()]
++    entries = []
++    for record in store.list_entries():
++        entry = record.to_dict()
++        metadata = _metadata_for_entry(record.id)
++        owner_user_id = str(metadata.get("owner_user_id") or "")
++        if owner_user_id:
++            entry["owner_user_id"] = owner_user_id
++        entries.append(entry)
      return {"entries": entries, "count": len(entries), "root": str(store.root)}
  
  
@@ -107,6 +123,38 @@ diff --git a/backend/modules/library/router.py b/backend/modules/library/router.
 +    return {"entry_id": entry_id, **_vote_summary(entry_votes, user_id)}
 +
 +
++@router.post("/delete-owned/{entry_id}")
++def delete_owned_entry(entry_id: str, payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
++    user_id = _normalize_user_id(payload.get("user_id"))
++    metadata = _metadata_for_entry(entry_id)
++    owner_user_id = str(metadata.get("owner_user_id") or "")
++    if not owner_user_id:
++        raise HTTPException(403, "This generation has no owner metadata")
++    if owner_user_id != user_id:
++        raise HTTPException(403, "Only the creator can delete this generation")
++
++    ok = get_store().delete_entry(entry_id)
++    if not ok:
++        raise HTTPException(404, f"Entry {entry_id!r} not found or could not be deleted")
++
++    votes_payload = _load_votes()
++    votes_payload.get("entries", {}).pop(entry_id, None)
++    _save_votes(votes_payload)
++    return {"deleted": entry_id}
++
++
  @router.get("/entries/{entry_id}")
  def get_entry(entry_id: str) -> dict[str, Any]:
      record = get_store().get_entry(entry_id)
+     if record is None:
+         raise HTTPException(404, f"Entry {entry_id!r} not found")
+-    return record.to_dict()
++    entry = record.to_dict()
++    metadata = _metadata_for_entry(entry_id)
++    owner_user_id = str(metadata.get("owner_user_id") or "")
++    if owner_user_id:
++        entry["owner_user_id"] = owner_user_id
++    return entry
+ 
+ 
+ @router.get("/audio/{entry_id}")

@@ -1,12 +1,22 @@
-diff --git a/backend/server.py b/backend/server.py
+﻿diff --git a/backend/server.py b/backend/server.py
+index 9aeceb9..481dcc1 100644
 --- a/backend/server.py
 +++ b/backend/server.py
-@@ -1113,6 +1113,17 @@ async def _run_generate_job(
+@@ -1069,6 +1069,7 @@ async def _run_generate_job(
+     lora_paths: list[str],
+     lora_weights: list[float],
+     lora_temp_dir: Path | None,
++    owner_user_id: str = "",
+ ):
+     JOBS[job_id]["status"] = "running"
+     loop = asyncio.get_event_loop()
+@@ -1113,6 +1114,19 @@ async def _run_generate_job(
                          int(args.get("seed", -1)),
                          custom_name,
                      )
 +                    item = {
 +                        "entry_id": f"{job_id}_{i:02d}",
++                        "owner_user_id": owner_user_id,
 +                        "audio_base64": base64.b64encode(audio_bytes).decode("ascii"),
 +                        "mime_type": mime_type,
 +                        "filename": filename,
@@ -20,7 +30,15 @@ diff --git a/backend/server.py b/backend/server.py
  
                      def _do_specs_and_save():
                          waveform, sr = torchaudio.load(io.BytesIO(audio_bytes))
-@@ -1190,17 +1201,7 @@ async def _run_generate_job(
+@@ -1132,6 +1146,7 @@ async def _run_generate_job(
+                                 "steps": args.get("steps"),
+                                 "cfg_scale": args.get("cfg_scale"),
+                                 "seed": args.get("seed"),
++                                "owner_user_id": owner_user_id,
+                             },
+                         )
+                         return spectrograms, artifact_info
+@@ -1190,17 +1205,7 @@ async def _run_generate_job(
                      _add_to_spec_cache(f"{job_id}:{i}", spectrograms)
                      if i == 0:
                          _add_to_spec_cache(job_id, spectrograms)
@@ -39,3 +57,19 @@ diff --git a/backend/server.py b/backend/server.py
              finally:
                  if lora_paths:
                      _clear_generation_loras(generation_pipeline)
+@@ -1275,6 +1280,7 @@ async def generate_jobs(
+     inversion_gamma: float = Form(0.5),
+     inversion_unconditional: str = Form("false"),
+     cut_to_duration: str = Form("true"),
++    user_id: str = Form(""),
+     init_audio: Optional[UploadFile] = File(None),
+     inpaint_audio: Optional[UploadFile] = File(None),
+ ):
+@@ -1389,6 +1395,7 @@ async def generate_jobs(
+             lora_paths,
+             lora_weights,
+             lora_temp_dir,
++            "".join(ch for ch in str(user_id).strip()[:80] if ch.isalnum() or ch in "-_"),
+         )
+     )
+ 

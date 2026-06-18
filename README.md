@@ -53,7 +53,7 @@ Keep the backend and tunnel windows open while the public site should generate m
 
 `patches/stabledaw-audio-ready.patch` makes `/api/jobs/{id}` expose generated audio as soon as diffusion is done, before spectrogram generation finishes. This lets the public page show the player immediately at `8/8` instead of waiting for spectrogram post-processing.
 
-`patches/stabledaw-library-votes.patch` adds simple per-user like/dislike storage under the local generations folder. The public page creates a browser-local user id and sends it to `/api/library/votes/*`, so one browser user can keep one vote per track.
+`patches/stabledaw-library-votes.patch` adds simple per-user like/dislike storage under the local generations folder. The public page creates a browser-local user id and sends it to `/api/library/votes/*`, so one browser user can keep one vote per track. It also adds owner-checked deletion through `/api/library/delete-owned/{entry_id}` for generations created from the public page.
 
 ## Deploy Simple Page
 
