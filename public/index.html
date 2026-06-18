@@ -125,6 +125,14 @@
         text-align: right;
       }
 
+      .status.ready {
+        color: var(--accent-2);
+      }
+
+      .status.offline {
+        color: var(--danger);
+      }
+
       .body {
         display: block;
       }
@@ -144,6 +152,21 @@
         align-items: baseline;
         justify-content: space-between;
         gap: 16px;
+      }
+
+      .backend-notice {
+        margin-bottom: 18px;
+        border: 1px solid rgba(255, 91, 91, 0.38);
+        background: rgba(255, 91, 91, 0.1);
+        color: var(--text);
+        padding: 14px 16px;
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      .backend-notice a {
+        color: var(--accent);
+        font-weight: 850;
       }
 
       .label-actions {
@@ -680,6 +703,11 @@
 
         <div class="body tab-panel" id="generatePanel">
           <form class="compose" id="form">
+            <div class="backend-notice" id="backendNotice" hidden>
+              Generator is offline right now. Message me in Telegram:
+              <a href="https://t.me/WizardJIOCb" target="_blank" rel="noreferrer">https://t.me/WizardJIOCb</a>
+              and I will turn it on :D
+            </div>
             <div class="prompt-head">
               <div class="label-actions">
                 <label for="prompt">Prompt</label>
@@ -704,7 +732,7 @@
                 </div>
               </div>
               <div class="generate-controls">
-                <button id="generate" type="submit">Generate</button>
+                <button id="generate" type="submit" disabled>Generate</button>
                 <label class="autoplay-toggle">
                   <input id="autoplay" type="checkbox" checked />
                   autoplay
@@ -770,6 +798,7 @@
       const regeneratePrompt = document.getElementById('regeneratePrompt');
       const generateButton = document.getElementById('generate');
       const autoplayInput = document.getElementById('autoplay');
+      const backendNotice = document.getElementById('backendNotice');
       const result = document.getElementById('result');
       const health = document.getElementById('health');
       const bar = document.getElementById('bar');
@@ -793,6 +822,8 @@
       let historyEntries = [];
       let historyCurrentPage = 1;
       let historyLoaded = false;
+      let backendReady = false;
+      let isGenerating = false;
       let votesByEntry = {};
       const votePending = new Set();
 
@@ -1154,10 +1185,20 @@
           const response = await fetch('/api/model-info', { cache: 'no-store' });
           const payload = await readJson(response);
           if (!response.ok) throw new Error(payload.detail || payload.error || `HTTP ${response.status}`);
-          health.textContent = `${payload.active_model?.toUpperCase() || 'MEDIUM'} ready`;
+          setBackendReady(true, `${payload.active_model?.toUpperCase() || 'MEDIUM'} ready`);
         } catch (error) {
-          health.textContent = 'backend offline';
+          setBackendReady(false, 'generator offline');
         }
+      }
+
+      function setBackendReady(isReady, label) {
+        backendReady = Boolean(isReady);
+        health.textContent = label;
+        health.classList.toggle('ready', backendReady);
+        health.classList.toggle('offline', !backendReady);
+        backendNotice.hidden = backendReady;
+        generateButton.disabled = isGenerating || !backendReady;
+        generateButton.title = backendReady ? '' : 'Generator is offline';
       }
 
       function switchTab(tab) {
@@ -1316,10 +1357,15 @@
 
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
+        if (!backendReady) {
+          setBackendReady(false, 'generator offline');
+          return;
+        }
         const prompt = promptInput.value.trim();
         if (!prompt) return;
         updateCounters();
 
+        isGenerating = true;
         generateButton.disabled = true;
         showLoader();
         setProgress({ step: 0, steps: Number(defaults.steps) });
@@ -1343,7 +1389,8 @@
         } catch (error) {
           showError(error?.message || String(error));
         } finally {
-          generateButton.disabled = false;
+          isGenerating = false;
+          generateButton.disabled = !backendReady;
           jobMeta.textContent = settingsLabel();
         }
       });
