@@ -154,6 +154,10 @@
         gap: 16px;
       }
 
+      .prompt-head .meta {
+        flex: 0 0 auto;
+      }
+
       .backend-notice {
         margin-bottom: 18px;
         border: 1px solid rgba(255, 91, 91, 0.38);
@@ -173,6 +177,7 @@
         display: inline-flex;
         align-items: baseline;
         gap: 8px;
+        min-width: 0;
       }
 
       .text-action {
@@ -184,6 +189,8 @@
         font-size: 12px;
         font-weight: 800;
         cursor: pointer;
+        white-space: nowrap;
+        flex: 0 0 auto;
       }
 
       .text-action:hover {
@@ -655,6 +662,19 @@
         .download {
           width: 100%;
           margin-top: 12px;
+        }
+
+        .prompt-head {
+          gap: 10px;
+        }
+
+        .label-actions {
+          gap: 6px;
+        }
+
+        .text-action {
+          width: auto;
+          margin-top: 0;
         }
 
         .history-toolbar,
