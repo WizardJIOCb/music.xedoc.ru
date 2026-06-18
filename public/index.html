@@ -653,8 +653,8 @@
               <div class="field">
                 <label for="durationRange">Duration</label>
                 <div class="duration-line">
-                  <input id="durationRange" type="range" min="5" max="180" step="1" value="60" />
-                  <span class="meta" id="durationLabel">1:00</span>
+                  <input id="durationRange" type="range" min="5" max="180" step="1" value="120" />
+                  <span class="meta" id="durationLabel">2:00</span>
                 </div>
               </div>
               <div class="generate-controls">
@@ -667,7 +667,7 @@
             </div>
 
             <div class="row">
-              <div class="meta" id="jobMeta">Length 1:00 | Steps 8 | CFG 1 | Seed ... | WAV</div>
+              <div class="meta" id="jobMeta">Length 2:00 | Steps 8 | CFG 1 | Seed ... | WAV</div>
             </div>
 
             <div class="progress" aria-hidden="true">
@@ -798,9 +798,9 @@
       }
 
       function clampDuration(value) {
-        if (String(value).trim() === '') return 60;
+        if (String(value).trim() === '') return 120;
         const number = Math.round(Number(value));
-        if (!Number.isFinite(number)) return 60;
+        if (!Number.isFinite(number)) return 120;
         return Math.max(5, Math.min(180, number));
       }
 
@@ -1281,7 +1281,7 @@
         });
       });
 
-      syncDuration(60);
+      syncDuration(120);
       promptInput.value = randomPrompt();
       updateCounters();
       checkHealth();
