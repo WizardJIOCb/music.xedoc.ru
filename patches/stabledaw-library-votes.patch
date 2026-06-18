@@ -1,0 +1,112 @@
+diff --git a/backend/modules/library/router.py b/backend/modules/library/router.py
+--- a/backend/modules/library/router.py
++++ b/backend/modules/library/router.py
+@@ -35,12 +35,106 @@ def get_store() -> LibraryStore:
+ 
+ router = APIRouter()
+ 
+ 
++def _votes_path() -> Path:
++    store = get_store()
++    store.root.mkdir(parents=True, exist_ok=True)
++    return store.root / "_votes.json"
++
++
++def _load_votes() -> dict[str, Any]:
++    path = _votes_path()
++    if not path.is_file():
++        return {"entries": {}}
++    try:
++        payload = json.loads(path.read_text(encoding="utf-8"))
++        if isinstance(payload, dict) and isinstance(payload.get("entries"), dict):
++            return payload
++    except (OSError, json.JSONDecodeError) as exc:
++        log.warning("library votes: failed to read %s: %s", path, exc)
++    return {"entries": {}}
++
++
++def _save_votes(payload: dict[str, Any]) -> None:
++    path = _votes_path()
++    tmp = path.with_suffix(".json.tmp")
++    tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
++    tmp.replace(path)
++
++
++def _normalize_vote(value: Any) -> str:
++    vote = str(value or "").strip().lower()
++    if vote in {"like", "dislike"}:
++        return vote
++    return ""
++
++
++def _normalize_user_id(value: Any) -> str:
++    user_id = str(value or "").strip()[:80]
++    if not user_id:
++        raise HTTPException(400, "user_id is required")
++    return "".join(ch for ch in user_id if ch.isalnum() or ch in "-_")
++
++
++def _vote_summary(entry_votes: dict[str, Any], user_id: str = "") -> dict[str, Any]:
++    values = [_normalize_vote(v) for v in entry_votes.values()]
++    return {
++        "likes": sum(1 for vote in values if vote == "like"),
++        "dislikes": sum(1 for vote in values if vote == "dislike"),
++        "user_vote": _normalize_vote(entry_votes.get(user_id)) if user_id else "",
++    }
++
++
+ @router.get("/entries")
+ def list_entries() -> dict[str, Any]:
+     store = get_store()
+     entries = [r.to_dict() for r in store.list_entries()]
+     return {"entries": entries, "count": len(entries), "root": str(store.root)}
+ 
+ 
++@router.get("/votes")
++def list_votes(user_id: str = "") -> dict[str, Any]:
++    payload = _load_votes()
++    entries = payload.get("entries", {})
++    return {
++        "votes": {
++            entry_id: _vote_summary(votes if isinstance(votes, dict) else {}, user_id)
++            for entry_id, votes in entries.items()
++        }
++    }
++
++
++@router.get("/votes/{entry_id}")
++def get_votes(entry_id: str, user_id: str = "") -> dict[str, Any]:
++    payload = _load_votes()
++    entries = payload.get("entries", {})
++    entry_votes = entries.get(entry_id, {})
++    if not isinstance(entry_votes, dict):
++        entry_votes = {}
++    return {"entry_id": entry_id, **_vote_summary(entry_votes, user_id)}
++
++
++@router.post("/votes/{entry_id}")
++def set_vote(entry_id: str, payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
++    user_id = _normalize_user_id(payload.get("user_id"))
++    vote = _normalize_vote(payload.get("vote"))
++
++    votes_payload = _load_votes()
++    entries = votes_payload.setdefault("entries", {})
++    entry_votes = entries.setdefault(entry_id, {})
++    if not isinstance(entry_votes, dict):
++        entry_votes = {}
++        entries[entry_id] = entry_votes
++
++    if vote:
++        entry_votes[user_id] = vote
++    else:
++        entry_votes.pop(user_id, None)
++        if not entry_votes:
++            entries.pop(entry_id, None)
++
++    _save_votes(votes_payload)
++    return {"entry_id": entry_id, **_vote_summary(entry_votes, user_id)}
++
++
+ @router.get("/entries/{entry_id}")
+ def get_entry(entry_id: str) -> dict[str, Any]:
+     record = get_store().get_entry(entry_id)

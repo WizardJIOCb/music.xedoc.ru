@@ -6,6 +6,7 @@ diff --git a/backend/server.py b/backend/server.py
                          custom_name,
                      )
 +                    item = {
++                        "entry_id": f"{job_id}_{i:02d}",
 +                        "audio_base64": base64.b64encode(audio_bytes).decode("ascii"),
 +                        "mime_type": mime_type,
 +                        "filename": filename,

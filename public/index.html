@@ -235,6 +235,25 @@
         margin-top: 20px;
       }
 
+      .generate-controls {
+        display: grid;
+        gap: 8px;
+      }
+
+      .autoplay-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: lowercase;
+      }
+
+      .autoplay-toggle input {
+        accent-color: var(--accent);
+      }
+
       .field label {
         margin-bottom: 8px;
       }
@@ -518,6 +537,32 @@
         border: 1px solid var(--line);
       }
 
+      .vote-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .vote-button {
+        height: 34px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--muted);
+        font-size: 12px;
+        padding: 0 12px;
+      }
+
+      .vote-button.active {
+        border-color: rgba(255, 206, 69, 0.55);
+        background: rgba(255, 206, 69, 0.15);
+        color: var(--text);
+      }
+
+      .vote-button[data-vote-value='dislike'].active {
+        border-color: rgba(255, 107, 138, 0.55);
+        background: rgba(255, 107, 138, 0.14);
+      }
+
       @media (max-width: 820px) {
         main {
           width: min(100% - 20px, 980px);
@@ -556,6 +601,10 @@
 
         .history-actions audio {
           margin-bottom: 12px;
+        }
+
+        .vote-actions {
+          margin-top: 12px;
         }
 
         .spectrogram-grid {
@@ -608,7 +657,13 @@
                   <span class="meta" id="durationLabel">1:00</span>
                 </div>
               </div>
-              <button id="generate" type="submit">Generate</button>
+              <div class="generate-controls">
+                <button id="generate" type="submit">Generate</button>
+                <label class="autoplay-toggle">
+                  <input id="autoplay" type="checkbox" checked />
+                  autoplay
+                </label>
+              </div>
             </div>
 
             <div class="row">
@@ -639,6 +694,14 @@
                 <option value="20">20</option>
               </select>
             </label>
+            <label>
+              Sort
+              <select id="historySort">
+                <option value="newest" selected>Newest</option>
+                <option value="likes">Likes</option>
+                <option value="dislikes">Dislikes</option>
+              </select>
+            </label>
           </div>
           <div class="history-list" id="historyList"></div>
           <div class="pager">
@@ -656,6 +719,7 @@
       const negativeInput = document.getElementById('negativePrompt');
       const regeneratePrompt = document.getElementById('regeneratePrompt');
       const generateButton = document.getElementById('generate');
+      const autoplayInput = document.getElementById('autoplay');
       const result = document.getElementById('result');
       const health = document.getElementById('health');
       const bar = document.getElementById('bar');
@@ -673,10 +737,29 @@
       const historyPrev = document.getElementById('historyPrev');
       const historyNext = document.getElementById('historyNext');
       const historyPageSize = document.getElementById('historyPageSize');
+      const historySort = document.getElementById('historySort');
 
       let historyEntries = [];
       let historyCurrentPage = 1;
       let historyLoaded = false;
+      let votesByEntry = {};
+      const votePending = new Set();
+
+      function getUserId() {
+        const key = 'musicXedocUserId';
+        try {
+          let userId = localStorage.getItem(key);
+          if (!userId) {
+            userId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+            localStorage.setItem(key, userId);
+          }
+          return userId;
+        } catch {
+          return 'local-user';
+        }
+      }
+
+      const userId = getUserId();
 
       function randomSeed() {
         return String(Math.floor(Math.random() * 2147483647));
@@ -828,6 +911,65 @@
         return `${Math.round(value / 1024)} KB`;
       }
 
+      function entryIdForItem(item) {
+        return item?.entry_id || item?.id || '';
+      }
+
+      function voteInfo(entryId) {
+        return votesByEntry[entryId] || { likes: 0, dislikes: 0, user_vote: '' };
+      }
+
+      function renderVoteActions(entryId) {
+        if (!entryId) return '';
+        const info = voteInfo(entryId);
+        const disabled = votePending.has(entryId) ? 'disabled' : '';
+        return `
+          <div class="vote-actions" data-vote-entry="${escapeHtml(entryId)}">
+            <button class="vote-button ${info.user_vote === 'like' ? 'active' : ''}" type="button" data-vote-value="like" ${disabled}>Like ${Number(info.likes || 0)}</button>
+            <button class="vote-button ${info.user_vote === 'dislike' ? 'active' : ''}" type="button" data-vote-value="dislike" ${disabled}>Dislike ${Number(info.dislikes || 0)}</button>
+          </div>
+        `;
+      }
+
+      function updateVoteBlocks(entryId) {
+        document.querySelectorAll('[data-vote-entry]').forEach((node) => {
+          if (node.dataset.voteEntry === entryId) {
+            node.outerHTML = renderVoteActions(entryId);
+          }
+        });
+      }
+
+      async function loadVotes() {
+        const response = await fetch(`/api/library/votes?user_id=${encodeURIComponent(userId)}`, { cache: 'no-store' });
+        const payload = await readJson(response);
+        if (!response.ok) throw new Error(payload.detail || payload.error || `HTTP ${response.status}`);
+        votesByEntry = payload.votes || {};
+      }
+
+      async function submitVote(entryId, vote) {
+        if (votePending.has(entryId)) return;
+        votePending.add(entryId);
+        updateVoteBlocks(entryId);
+        const current = voteInfo(entryId).user_vote;
+        const nextVote = current === vote ? '' : vote;
+        try {
+          const response = await fetch(`/api/library/votes/${encodeURIComponent(entryId)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId, vote: nextVote }),
+          });
+          const payload = await readJson(response);
+          if (!response.ok) throw new Error(payload.detail || payload.error || `HTTP ${response.status}`);
+          await loadVotes();
+          if (!historyPanel.hidden && historySort.value !== 'newest') {
+            renderHistory();
+          }
+        } finally {
+          votePending.delete(entryId);
+          updateVoteBlocks(entryId);
+        }
+      }
+
       function hasSpectrograms(spectrograms) {
         return Boolean(spectrograms && ['mel', 'stft', 'chromagram', 'cqt'].some((key) => spectrograms[key]));
       }
@@ -868,21 +1010,29 @@
         `;
       }
 
-      function showPlayer(item, spectrograms = item.spectrograms) {
+      function showPlayer(item, spectrograms = item.spectrograms, shouldAutoplay = false) {
         const mimeType = item.mime_type || 'audio/wav';
         const filename = item.filename || 'music-xedoc.wav';
+        const entryId = entryIdForItem(item);
         const src = `data:${mimeType};base64,${item.audio_base64}`;
         result.className = '';
         result.innerHTML = `
           <div class="card">
             <p class="card-title">Result</p>
-            <audio controls src="${src}"></audio>
+            <audio id="generatedAudio" controls src="${src}"></audio>
+            ${renderVoteActions(entryId)}
           </div>
           <div class="card">
             <a class="download" download="${escapeHtml(filename)}" href="${src}">Download result</a>
           </div>
           <div id="spectrogramSlot">${renderSpectrograms(spectrograms, !hasSpectrograms(spectrograms))}</div>
         `;
+        if (shouldAutoplay) {
+          const audio = document.getElementById('generatedAudio');
+          if (audio) {
+            void audio.play().catch(() => {});
+          }
+        }
       }
 
       function updateSpectrogramSlot(spectrograms) {
@@ -945,11 +1095,22 @@
 
       function renderHistory() {
         const pageSize = Number(historyPageSize.value || 5);
-        const total = historyEntries.length;
+        const sortedEntries = [...historyEntries].sort((a, b) => {
+          const aVotes = voteInfo(a.id);
+          const bVotes = voteInfo(b.id);
+          if (historySort.value === 'likes') {
+            return (bVotes.likes || 0) - (aVotes.likes || 0) || new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
+          }
+          if (historySort.value === 'dislikes') {
+            return (bVotes.dislikes || 0) - (aVotes.dislikes || 0) || new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
+          }
+          return new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
+        });
+        const total = sortedEntries.length;
         const pages = Math.max(1, Math.ceil(total / pageSize));
         historyCurrentPage = Math.max(1, Math.min(historyCurrentPage, pages));
         const start = (historyCurrentPage - 1) * pageSize;
-        const visible = historyEntries.slice(start, start + pageSize);
+        const visible = sortedEntries.slice(start, start + pageSize);
 
         historyMeta.textContent = total ? `${total} generations` : 'No generations yet';
         historyPage.textContent = `Page ${historyCurrentPage} / ${pages}`;
@@ -989,6 +1150,7 @@
                 <audio controls preload="none" src="${escapeHtml(audioUrl)}"></audio>
                 <a class="download" download="${escapeHtml(filename)}" href="${escapeHtml(audioUrl)}">Download</a>
               </div>
+              ${renderVoteActions(entry.id)}
             </article>
           `;
         }).join('');
@@ -999,6 +1161,7 @@
         historyMeta.textContent = 'Loading history...';
         historyList.innerHTML = '<div class="empty">Loading saved generations...</div>';
         try {
+          await loadVotes();
           const response = await fetch('/api/library/entries', { cache: 'no-store' });
           const payload = await readJson(response);
           if (!response.ok) throw new Error(payload.detail || payload.error || `HTTP ${response.status}`);
@@ -1024,7 +1187,7 @@
           const item = job.result?.item || job.result?.items?.[0];
           if (item?.audio_base64) {
             setProgress({ step: Number(defaults.steps), steps: Number(defaults.steps) });
-            showPlayer(item, item.spectrograms);
+            showPlayer(item, item.spectrograms, autoplayInput.checked);
             if (!hasSpectrograms(item.spectrograms)) {
               void attachSpectrogramsWhenReady(id, 0);
             }
@@ -1034,7 +1197,7 @@
           if (job.status === 'completed') {
             if (!item?.audio_base64) throw new Error('Generation completed without audio.');
             setProgress({ step: Number(defaults.steps), steps: Number(defaults.steps) });
-            showPlayer(item, item.spectrograms);
+            showPlayer(item, item.spectrograms, autoplayInput.checked);
             return;
           }
 
@@ -1094,6 +1257,10 @@
         historyCurrentPage = 1;
         renderHistory();
       });
+      historySort.addEventListener('change', () => {
+        historyCurrentPage = 1;
+        renderHistory();
+      });
       historyPrev.addEventListener('click', () => {
         historyCurrentPage -= 1;
         renderHistory();
@@ -1101,6 +1268,17 @@
       historyNext.addEventListener('click', () => {
         historyCurrentPage += 1;
         renderHistory();
+      });
+      document.addEventListener('click', (event) => {
+        const button = event.target.closest('.vote-button');
+        if (!button) return;
+        const container = button.closest('[data-vote-entry]');
+        const entryId = container?.dataset.voteEntry;
+        const vote = button.dataset.voteValue;
+        if (!entryId || !vote) return;
+        void submitVote(entryId, vote).catch((error) => {
+          showError(error?.message || String(error));
+        });
       });
 
       syncDuration(60);
