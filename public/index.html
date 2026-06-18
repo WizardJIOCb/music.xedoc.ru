@@ -240,6 +240,57 @@
         transition: width 220ms ease;
       }
 
+      .loader-card {
+        min-height: 190px;
+        display: grid;
+        place-items: center;
+        gap: 16px;
+        text-align: center;
+      }
+
+      .spinner {
+        width: 54px;
+        height: 54px;
+        border: 4px solid rgba(255, 255, 255, 0.14);
+        border-top-color: var(--accent);
+        border-right-color: var(--accent-2);
+        border-radius: 50%;
+        animation: spin 850ms linear infinite;
+      }
+
+      .loader-title {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 850;
+      }
+
+      .loader-copy {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .loader-progress {
+        width: min(420px, 100%);
+        height: 8px;
+        overflow: hidden;
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .loader-progress span {
+        display: block;
+        width: 0%;
+        height: 100%;
+        background: linear-gradient(90deg, var(--accent), var(--accent-2));
+        transition: width 220ms ease;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
       .card {
         border: 1px solid var(--line);
         background: var(--panel-strong);
@@ -473,17 +524,49 @@
         negativeCount.textContent = `${negativeInput.value.length}/500`;
       }
 
+      function updateLoader(progress) {
+        const loaderBar = document.getElementById('loaderBar');
+        const loaderStatus = document.getElementById('loaderStatus');
+        if (!loaderBar || !loaderStatus) return;
+
+        const step = Number(progress?.step ?? 0);
+        const steps = Number(progress?.steps ?? defaults.steps);
+        const pct = steps > 0 ? Math.max(0, Math.min(100, (step / steps) * 100)) : 0;
+        loaderBar.style.width = `${pct}%`;
+        loaderStatus.textContent = step > 0
+          ? `Generating ${step}/${steps} (${Math.round(pct)}%)`
+          : 'Preparing model and queueing the job';
+      }
+
       function setProgress(progress) {
         const step = Number(progress?.step ?? 0);
         const steps = Number(progress?.steps ?? defaults.steps);
         const pct = steps > 0 ? Math.max(0, Math.min(100, (step / steps) * 100)) : 0;
         bar.style.width = `${pct}%`;
         jobMeta.textContent = progress ? `Generating ${step}/${steps}` : settingsLabel();
+        updateLoader(progress);
       }
 
       function showError(message) {
         result.className = 'card error';
         result.textContent = message;
+      }
+
+      function showLoader() {
+        result.className = '';
+        result.innerHTML = `
+          <div class="card loader-card" role="status" aria-live="polite">
+            <div class="spinner" aria-hidden="true"></div>
+            <div>
+              <p class="loader-title">Generating track</p>
+              <p class="loader-copy" id="loaderStatus">Preparing model and queueing the job</p>
+            </div>
+            <div class="loader-progress" aria-hidden="true">
+              <span id="loaderBar"></span>
+            </div>
+          </div>
+        `;
+        updateLoader({ step: 0, steps: Number(defaults.steps) });
       }
 
       function escapeHtml(value) {
@@ -601,8 +684,7 @@
         updateCounters();
 
         generateButton.disabled = true;
-        result.className = 'empty';
-        result.textContent = 'Generating. You can keep this tab open.';
+        showLoader();
         setProgress({ step: 0, steps: Number(defaults.steps) });
 
         try {
