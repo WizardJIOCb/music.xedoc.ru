@@ -543,6 +543,11 @@
         gap: 8px;
       }
 
+      .result-votes {
+        justify-content: center;
+        margin-top: 14px;
+      }
+
       .vote-button {
         height: 34px;
         border: 1px solid var(--line);
@@ -619,6 +624,10 @@
 
         .vote-actions {
           margin-top: 12px;
+        }
+
+        .result-votes {
+          display: flex;
         }
 
         .spectrogram-grid {
@@ -937,12 +946,13 @@
         return votesByEntry[entryId] || { likes: 0, dislikes: 0, user_vote: '' };
       }
 
-      function renderVoteActions(entryId, canDelete = false) {
+      function renderVoteActions(entryId, canDelete = false, extraClass = '') {
         if (!entryId) return '';
         const info = voteInfo(entryId);
         const disabled = votePending.has(entryId) ? 'disabled' : '';
+        const className = `vote-actions ${extraClass}`.trim();
         return `
-          <div class="vote-actions" data-vote-entry="${escapeHtml(entryId)}">
+          <div class="${escapeHtml(className)}" data-vote-entry="${escapeHtml(entryId)}">
             <button class="vote-button ${info.user_vote === 'like' ? 'active' : ''}" type="button" data-vote-value="like" ${disabled}>Like ${Number(info.likes || 0)}</button>
             <button class="vote-button ${info.user_vote === 'dislike' ? 'active' : ''}" type="button" data-vote-value="dislike" ${disabled}>Dislike ${Number(info.dislikes || 0)}</button>
             ${canDelete ? `<button class="delete-button" type="button" data-delete-entry="${escapeHtml(entryId)}">Delete</button>` : ''}
@@ -954,7 +964,8 @@
         document.querySelectorAll('[data-vote-entry]').forEach((node) => {
           if (node.dataset.voteEntry === entryId) {
             const canDelete = node.querySelector('[data-delete-entry]') !== null;
-            node.outerHTML = renderVoteActions(entryId, canDelete);
+            const extraClass = node.classList.contains('result-votes') ? 'result-votes' : '';
+            node.outerHTML = renderVoteActions(entryId, canDelete, extraClass);
           }
         });
       }
@@ -1060,7 +1071,7 @@
           <div class="card">
             <p class="card-title">Result</p>
             <audio id="generatedAudio" controls src="${src}"></audio>
-            ${renderVoteActions(entryId, canDelete)}
+            ${renderVoteActions(entryId, canDelete, 'result-votes')}
           </div>
           <div class="card">
             <a class="download" download="${escapeHtml(filename)}" href="${src}">Download result</a>
