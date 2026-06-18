@@ -146,6 +146,27 @@
         gap: 16px;
       }
 
+      .label-actions {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 8px;
+      }
+
+      .text-action {
+        height: auto;
+        border: 0;
+        padding: 0;
+        background: transparent;
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 800;
+        cursor: pointer;
+      }
+
+      .text-action:hover {
+        color: var(--accent-2);
+      }
+
       label {
         display: block;
         margin-bottom: 10px;
@@ -565,7 +586,10 @@
         <div class="body tab-panel" id="generatePanel">
           <form class="compose" id="form">
             <div class="prompt-head">
-              <label for="prompt">Prompt</label>
+              <div class="label-actions">
+                <label for="prompt">Prompt</label>
+                <button class="text-action" id="regeneratePrompt" type="button">[Regenerate]</button>
+              </div>
               <span class="meta" id="promptCount">0/1000</span>
             </div>
             <textarea id="prompt" name="prompt" maxlength="1000" placeholder="Example: cyberpunk post rock, warm analog drums, wide cinematic guitars" required></textarea>
@@ -630,6 +654,7 @@
       const form = document.getElementById('form');
       const promptInput = document.getElementById('prompt');
       const negativeInput = document.getElementById('negativePrompt');
+      const regeneratePrompt = document.getElementById('regeneratePrompt');
       const generateButton = document.getElementById('generate');
       const result = document.getElementById('result');
       const health = document.getElementById('health');
@@ -1057,6 +1082,11 @@
       durationRange.addEventListener('input', () => syncDuration(durationRange.value));
       promptInput.addEventListener('input', updateCounters);
       negativeInput.addEventListener('input', updateCounters);
+      regeneratePrompt.addEventListener('click', () => {
+        promptInput.value = randomPrompt();
+        updateCounters();
+        promptInput.focus();
+      });
       tabButtons.forEach((button) => {
         button.addEventListener('click', () => switchTab(button.dataset.tab));
       });
