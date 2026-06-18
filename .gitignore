@@ -1,0 +1,27 @@
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+
+# Never commit local StableDAW runtime data or model weights here.
+models/
+data/
+generations/
+.venv/
+node_modules/
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.onnx
+*.wav
+*.mp3
+*.flac
+*.m4a
+
