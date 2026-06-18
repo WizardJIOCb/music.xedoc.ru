@@ -431,18 +431,18 @@
               <div class="field">
                 <label for="durationRange">Duration</label>
                 <div class="duration-line">
-                  <input id="durationRange" type="range" min="5" max="180" step="1" value="30" />
-                  <span class="meta" id="durationLabel">0:30</span>
+                  <input id="durationRange" type="range" min="5" max="180" step="1" value="60" />
+                  <span class="meta" id="durationLabel">1:00</span>
                 </div>
               </div>
               <div class="field">
                 <label for="durationInput">Seconds</label>
-                <input id="durationInput" type="number" min="5" max="180" step="1" value="30" />
+                <input id="durationInput" type="number" min="5" max="180" step="1" value="60" />
               </div>
             </div>
 
             <div class="row">
-              <div class="meta" id="jobMeta">Length 0:30 | Steps 8 | CFG 1 | Seed ... | WAV</div>
+              <div class="meta" id="jobMeta">Length 1:00 | Steps 8 | CFG 1 | Seed ... | WAV</div>
               <button id="generate" type="submit">Generate</button>
             </div>
 
@@ -491,8 +491,9 @@
       };
 
       function clampDuration(value) {
+        if (String(value).trim() === '') return 60;
         const number = Math.round(Number(value));
-        if (!Number.isFinite(number)) return 30;
+        if (!Number.isFinite(number)) return 60;
         return Math.max(5, Math.min(180, number));
       }
 
@@ -516,6 +517,22 @@
         durationRange.value = String(duration);
         durationInput.value = String(duration);
         durationLabel.textContent = formatDuration(duration);
+        jobMeta.textContent = settingsLabel();
+      }
+
+      function syncDurationFromTextInput() {
+        const typed = durationInput.value.trim();
+        if (!typed) {
+          durationLabel.textContent = '--';
+          jobMeta.textContent = `Length -- | Steps 8 | CFG 1 | Seed ${defaults.seed} | WAV`;
+          return;
+        }
+
+        const number = Number(typed);
+        if (!Number.isFinite(number)) return;
+        const preview = Math.max(0, Math.min(999, Math.round(number)));
+        durationRange.value = String(clampDuration(preview));
+        durationLabel.textContent = formatDuration(preview);
         jobMeta.textContent = settingsLabel();
       }
 
@@ -710,12 +727,12 @@
       });
 
       durationRange.addEventListener('input', () => syncDuration(durationRange.value));
-      durationInput.addEventListener('input', () => syncDuration(durationInput.value));
+      durationInput.addEventListener('input', syncDurationFromTextInput);
       durationInput.addEventListener('blur', () => syncDuration(durationInput.value));
       promptInput.addEventListener('input', updateCounters);
       negativeInput.addEventListener('input', updateCounters);
 
-      syncDuration(30);
+      syncDuration(60);
       updateCounters();
       checkHealth();
       setInterval(checkHealth, 15000);
