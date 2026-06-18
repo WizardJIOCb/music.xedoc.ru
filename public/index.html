@@ -1106,15 +1106,18 @@
 
       async function regeneratePromptWithLlm() {
         const originalLabel = regeneratePromptLlm.textContent;
+        const originalPrompt = promptInput.value;
         regeneratePromptLlm.disabled = true;
         regeneratePromptLlm.textContent = '[LLM...]';
+        promptInput.value = 'Generating prompt...';
+        updateCounters();
 
         try {
           const response = await fetch('/api/prompt-llm/generate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              prompt: promptInput.value.trim(),
+              prompt: originalPrompt.trim(),
               negative_prompt: negativeInput.value.trim(),
             }),
           });
@@ -1125,6 +1128,8 @@
           updateCounters();
           promptInput.focus();
         } catch (error) {
+          promptInput.value = originalPrompt;
+          updateCounters();
           showError(`LLM prompt generation failed: ${error?.message || String(error)}`);
         } finally {
           regeneratePromptLlm.disabled = false;
