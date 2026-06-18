@@ -190,6 +190,11 @@
         color: var(--accent-2);
       }
 
+      .text-action:disabled {
+        cursor: wait;
+        opacity: 0.62;
+      }
+
       label {
         display: block;
         margin-bottom: 10px;
@@ -712,6 +717,7 @@
               <div class="label-actions">
                 <label for="prompt">Prompt</label>
                 <button class="text-action" id="regeneratePrompt" type="button">[Regenerate]</button>
+                <button class="text-action" id="regeneratePromptLlm" type="button">[Regenerate LLM]</button>
               </div>
               <span class="meta" id="promptCount">0/1000</span>
             </div>
@@ -796,6 +802,7 @@
       const promptInput = document.getElementById('prompt');
       const negativeInput = document.getElementById('negativePrompt');
       const regeneratePrompt = document.getElementById('regeneratePrompt');
+      const regeneratePromptLlm = document.getElementById('regeneratePromptLlm');
       const generateButton = document.getElementById('generate');
       const autoplayInput = document.getElementById('autoplay');
       const backendNotice = document.getElementById('backendNotice');
@@ -1075,6 +1082,34 @@
       function updateCounters() {
         promptCount.textContent = `${promptInput.value.length}/1000`;
         negativeCount.textContent = `${negativeInput.value.length}/500`;
+      }
+
+      async function regeneratePromptWithLlm() {
+        const originalLabel = regeneratePromptLlm.textContent;
+        regeneratePromptLlm.disabled = true;
+        regeneratePromptLlm.textContent = '[LLM...]';
+
+        try {
+          const response = await fetch('/api/prompt-llm/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              prompt: promptInput.value.trim(),
+              negative_prompt: negativeInput.value.trim(),
+            }),
+          });
+          const payload = await readJson(response);
+          if (!response.ok) throw new Error(payload.detail || payload.error || `HTTP ${response.status}`);
+          if (!payload.prompt) throw new Error('Prompt LLM returned an empty prompt.');
+          promptInput.value = String(payload.prompt).slice(0, 1000);
+          updateCounters();
+          promptInput.focus();
+        } catch (error) {
+          showError(`LLM prompt generation failed: ${error?.message || String(error)}`);
+        } finally {
+          regeneratePromptLlm.disabled = false;
+          regeneratePromptLlm.textContent = originalLabel;
+        }
       }
 
       function updateLoader(progress) {
@@ -1566,6 +1601,9 @@
         promptInput.value = randomPrompt();
         updateCounters();
         promptInput.focus();
+      });
+      regeneratePromptLlm.addEventListener('click', () => {
+        void regeneratePromptWithLlm();
       });
       tabButtons.forEach((button) => {
         button.addEventListener('click', () => switchTab(button.dataset.tab));

@@ -14,6 +14,7 @@ The production setup is split in two:
 - Local Windows launchers: `scripts/start_music_xedoc.bat` and `scripts/stop_music_xedoc.bat`
 - StableDAW backend patch: `patches/stabledaw-audio-ready.patch`
 - StableDAW library votes patch: `patches/stabledaw-library-votes.patch`
+- StableDAW prompt LLM patch: `patches/stabledaw-prompt-llm.patch`
 - StableDAW app source locally: `C:\pinokio\api\stabledaw.pinokio.git\app`
 - StableDAW app clone on server: `/var/www/music.xedoc.ru/app`
 - Generated audio locally: `C:\pinokio\api\stabledaw.pinokio.git\app\data\generations`
@@ -54,6 +55,8 @@ Keep the backend and tunnel windows open while the public site should generate m
 `patches/stabledaw-audio-ready.patch` makes `/api/jobs/{id}` expose generated audio as soon as diffusion is done, before spectrogram generation finishes. This lets the public page show the player immediately at `8/8` instead of waiting for spectrogram post-processing.
 
 `patches/stabledaw-library-votes.patch` adds simple per-user like/dislike storage under the local generations folder. The public page creates a browser-local user id and sends it to `/api/library/votes/*`, so one browser user can keep one vote per track. It also adds owner-checked deletion through `/api/library/delete-owned/{entry_id}` for generations created from the public page.
+
+`patches/stabledaw-prompt-llm.patch` adds `/api/prompt-llm/*`, a lazy-loaded CPU prompt helper using `Qwen/Qwen2.5-0.5B-Instruct`. The public page uses it for the `[Regenerate LLM]` button next to the fast browser-only `[Regenerate]` prompt generator.
 
 ## Deploy Simple Page
 
