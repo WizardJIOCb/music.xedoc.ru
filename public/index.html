@@ -170,7 +170,7 @@
 
       .settings {
         display: grid;
-        grid-template-columns: 1fr 108px;
+        grid-template-columns: minmax(0, 1fr) auto;
         gap: 14px;
         align-items: end;
         margin-top: 16px;
@@ -196,7 +196,7 @@
         align-items: center;
         justify-content: space-between;
         gap: 14px;
-        margin-top: 16px;
+        margin-top: 14px;
       }
 
       .meta {
@@ -441,15 +441,11 @@
                   <span class="meta" id="durationLabel">1:00</span>
                 </div>
               </div>
-              <div class="field">
-                <label for="durationInput">Seconds</label>
-                <input id="durationInput" type="number" min="5" max="180" step="1" value="60" />
-              </div>
+              <button id="generate" type="submit">Generate</button>
             </div>
 
             <div class="row">
               <div class="meta" id="jobMeta">Length 1:00 | Steps 8 | CFG 1 | Seed ... | WAV</div>
-              <button id="generate" type="submit">Generate</button>
             </div>
 
             <div class="progress" aria-hidden="true">
@@ -476,7 +472,6 @@
       const promptCount = document.getElementById('promptCount');
       const negativeCount = document.getElementById('negativeCount');
       const durationRange = document.getElementById('durationRange');
-      const durationInput = document.getElementById('durationInput');
       const durationLabel = document.getElementById('durationLabel');
 
       function randomSeed() {
@@ -511,7 +506,7 @@
       }
 
       function currentDuration() {
-        return clampDuration(durationInput.value);
+        return clampDuration(durationRange.value);
       }
 
       function settingsLabel() {
@@ -521,24 +516,7 @@
       function syncDuration(value) {
         const duration = clampDuration(value);
         durationRange.value = String(duration);
-        durationInput.value = String(duration);
         durationLabel.textContent = formatDuration(duration);
-        jobMeta.textContent = settingsLabel();
-      }
-
-      function syncDurationFromTextInput() {
-        const typed = durationInput.value.trim();
-        if (!typed) {
-          durationLabel.textContent = '--';
-          jobMeta.textContent = `Length -- | Steps 8 | CFG 1 | Seed ${defaults.seed} | WAV`;
-          return;
-        }
-
-        const number = Number(typed);
-        if (!Number.isFinite(number)) return;
-        const preview = Math.max(0, Math.min(999, Math.round(number)));
-        durationRange.value = String(clampDuration(preview));
-        durationLabel.textContent = formatDuration(preview);
         jobMeta.textContent = settingsLabel();
       }
 
@@ -769,8 +747,6 @@
       });
 
       durationRange.addEventListener('input', () => syncDuration(durationRange.value));
-      durationInput.addEventListener('input', syncDurationFromTextInput);
-      durationInput.addEventListener('blur', () => syncDuration(durationInput.value));
       promptInput.addEventListener('input', updateCounters);
       negativeInput.addEventListener('input', updateCounters);
 
